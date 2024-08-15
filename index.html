@@ -450,8 +450,7 @@
             </div>
             <div class="column is-8 is-offset-2">
               <form
-                action="https://formspree.io/email@example.com"
-                method="POST"
+                id="myForm"
               >
                 <div class="field">
                   <label class="label">Name</label>
@@ -459,7 +458,7 @@
                     <input
                       class="input"
                       type="text"
-                      name="Name"
+                      name="entry.541930357"
                     />
                     <span class="icon is-small is-left">
                       <i class="fas fa-user"></i>
@@ -472,7 +471,7 @@
                     <input
                       class="input"
                       type="email"
-                      name="Email"
+                      name="entry.209049569"
                     />
                     <span class="icon is-small is-left">
                       <i class="fas fa-envelope"></i>
@@ -484,19 +483,20 @@
                   <div class="control">
                     <textarea
                       class="textarea"
-                      name="Message"
+                      name="entry.473835433"
                     ></textarea>
                   </div>
                 </div>
-                <div class="field">
+                
+              </form>
+			  <div class="field">
                   <div class="control ">
-                    <button class="button submit-button">
+                    <button class="button submit-button" onclick="submit();">
                       Submit&nbsp;&nbsp;
                       <i class="fas fa-paper-plane"></i>
                     </button>
                   </div>
                 </div>
-              </form>
             </div>
           </div>
         </div>
@@ -526,6 +526,24 @@
         easing: "ease-out",
         duration: 800,
       });
+	  
+	  function submit(){
+        var values = $('#myForm').serialize();
+        //console.log("posting");
+        $.ajax({
+            type: "POST",
+            url: "https://docs.google.com/forms/d/14KklEry8UIoie-F7K8pXgBOKj2UxBQHBDLKKCk76S_0/formResponse",
+            data: values,
+            crossDomain : true,
+            complete: function(data, textStatus) {
+            //console.log(textStatus);
+            window.location = "index.html";
+            }, 
+			error: function(){
+			window.location.reload();
+			}
+        });
+}
     </script>
   </body>
 </html>
