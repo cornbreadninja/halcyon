@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Endless Writer</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: #6f8fa3;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  .container {
+    max-width: 900px;
+    height: 90vh;
+    margin: 5vh auto;
+    background: #bcbcbc;
+    border-radius: 18px;
+    padding: 24px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .header h1 {
+    margin: 0;
+    font-size: 1.6rem;
+  }
+
+  .controls {
+    display: flex;
+    gap: 10px;
+    font-size: 0.9rem;
+  }
+
+  button {
+    border: none;
+    border-radius: 8px;
+    padding: 6px 12px;
+    cursor: pointer;
+  }
+
+  .counter {
+    text-align: right;
+    font-size: 0.85rem;
+    opacity: 0.8;
+    margin-bottom: 6px;
+  }
+
+  textarea {
+    flex: 1;
+    resize: none;
+    border: none;
+    border-radius: 12px;
+    padding: 18px;
+    font-size: 1.1rem;
+    line-height: 1.6;
+    outline: none;
+    box-sizing: border-box;
+  }
+
+  .status {
+    font-size: 0.75rem;
+    opacity: 0.6;
+    margin-top: 6px;
+    text-align: right;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <h1>Endless Writing</h1>
+    <div class="controls">
+      <button id="clearBtn">Clear</button>
+      <button id="exportBtn">Export</button>
+    </div>
+  </div>
+
+  <div class="counter">
+    Words: <span id="wordCount">0</span>
+  </div>
+
+  <textarea id="writer" placeholder="Just start typing…"></textarea>
+
+  <div class="status" id="status">Saved locally</div>
+</div>
+
+<script>
+  const textarea = document.getElementById("writer");
+  const wordCountEl = document.getElementById("wordCount");
+  const statusEl = document.getElementById("status");
+  const exportBtn = document.getElementById("exportBtn");
+  const clearBtn = document.getElementById("clearBtn");
+
+  const STORAGE_KEY = "endless-writer-text";
+  const INTERVAL = 250;
+  let lastDingAt = 0;
+// --- Audio ---
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  
+  // --- Restore saved text ---
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    textarea.value = saved;
+    updateWordCount();
+  }
+
+
+
+  function typewriterDing() {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.type = "square";
+    osc.frequency.value = 1200;
+
+    gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.2, audioCtx.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.2);
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.21);
+  }
+
+  function countWords(text) {
+    return text.trim() ? text.trim().split(/\s+/).length : 0;
+  }
+
+  function updateWordCount() {
+    const words = countWords(textarea.value);
+    wordCountEl.textContent = words;
+
+    if (words >= lastDingAt + INTERVAL) {
+      lastDingAt = Math.floor(words / INTERVAL) * INTERVAL;
+      typewriterDing();
+    }
+  }
+
+  // --- Autosave ---
+  let saveTimeout;
+  textarea.addEventListener("input", () => {
+  console.log("input happened");
+    updateWordCount();
+
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => {
+      localStorage.setItem(STORAGE_KEY, textarea.value);
+      statusEl.textContent = "Saved locally";
+    }, 300);
+  });
+
+  // --- Export ---
+  exportBtn.addEventListener("click", () => {
+    const blob = new Blob([textarea.value], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "endless-writing.txt";
+    a.click();
+
+    URL.revokeObjectURL(url);
+  });
+
+  // --- Clear ---
+   clearBtn.addEventListener("click", () => {
+    const ok = confirm("Clear all text? This cannot be undone.");
+    if (!ok) return;
+
+    autosaveEnabled = false;
+    clearTimeout(saveTimeout);
+
+    textarea.value = "";
+    localStorage.removeItem(STORAGE_KEY);
+    lastDingAt = 0;
+    updateWordCount();
+
+    statusEl.textContent = "Cleared";
+
+    // Re-enable autosave after state settles
+    setTimeout(() => {
+      autosaveEnabled = true;
+    }, 0);
+  });
+  
+  // Resume audio context on first interaction
+  document.addEventListener("click", () => {
+    if (audioCtx.state === "suspended") {
+      audioCtx.resume();
+    }
+  }, { once: true });
+</script>
+
+</body>
+</html>

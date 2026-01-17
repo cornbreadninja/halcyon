@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Spinner Wheel</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      margin-top: 30px;
+    }
+
+    canvas {
+      border-radius: 50%;
+      margin-top: 20px;
+    }
+
+    .controls {
+      margin-top: 10px;
+    }
+
+    input {
+      font-size: 16px;
+      padding: 6px;
+    }
+
+    button {
+      font-size: 16px;
+      padding: 6px 12px;
+      margin-left: 5px;
+      cursor: pointer;
+    }
+	
+	#nameList {
+	  list-style: none;
+	  padding: 0;
+	  max-width: 300px;
+	  margin: 20px auto;
+	  text-align: left;
+	}
+
+	#nameList li {
+	  display: flex;
+	  justify-content: space-between;
+	  align-items: center;
+	  padding: 4px 0;
+	}
+
+	#nameList input {
+	  flex: 1;
+	  font-size: 14px;
+	  margin-right: 6px;
+	}
+
+	#nameList button {
+	  font-size: 12px;
+	}
+	
+	/* Centers the whole wheel + list block in the viewport */
+	.wheel-container {
+	  display: flex;
+	  justify-content: center; /* horizontal centering */
+	  margin-top: 40px;        /* optional vertical spacing */
+	}
+
+	/* Places wheel and list side by side */
+	.wheel-layout {
+	  display: flex;
+	  align-items: flex-start; /* align top edges */
+	  gap: 30px;               /* space between wheel and list */
+	}
+
+	#nameList {
+	  list-style: none;
+	  padding: 0;
+	  width: 220px;
+	  max-height: 400px;
+	  overflow-y: auto;
+	  overflow-x: hidden;
+	}
+
+	#nameList li {
+	  display: flex;
+	  align-items: center;
+	  gap: 6px;
+	  margin-bottom: 6px;
+	  min-width: 0;
+	}
+
+	#nameList input {
+	  flex: 1;
+	  min-width: 0;
+	  font-size: 14px;
+	  box-sizing: border-box;
+	}
+
+	#nameList button {
+	  font-size: 12px;
+	  cursor: pointer;
+	}
+	
+	
+
+  </style>
+</head>
+<body>
+
+  <h1>My Own Damn Spinner Wheel</h1>
+
+  <div class="controls">
+    <input id="nameInput" placeholder="" />
+    <button id="addName">Add</button>
+    <button id="spin">Spin</button>
+  </div>
+
+
+	<div class="wheel-container">
+	  <div class="wheel-layout">
+		<canvas id="wheel" width="400" height="400"></canvas>
+		<ul id="nameList"></ul>
+	  </div>
+	</div>
+
+
+
+  <script>
+    const canvas = document.getElementById("wheel");
+    const ctx = canvas.getContext("2d");
+	const tickSound = new Audio("spin_ticks.wav");
+	tickSound.volume = 1;
+	
+	let lastTickIndex = null;
+    let names = [];
+	
+	const STORAGE_KEY = "spinnerWheelNames";
+
+	function saveNames() {
+	  localStorage.setItem(STORAGE_KEY, JSON.stringify(names));
+	}
+
+	function loadNames() {
+	  const stored = localStorage.getItem(STORAGE_KEY);
+	  if (stored) {
+		try {
+		  names = JSON.parse(stored);
+		} catch {
+		  names = [];
+		}
+	  }
+	}
+    const colors = [
+      "#f94144",
+      "#f3722c",
+      "#f9c74f",
+      "#90be6d",
+      "#577590",
+      "#277da1"
+    ];
+
+    const center = canvas.width / 2;
+    const radius = center;
+
+    let rotation = 0;
+    let spinning = false;
+	
+	function renderNameList() {
+	  const list = document.getElementById("nameList");
+	  list.innerHTML = "";
+
+	  names.forEach((name, index) => {
+		const li = document.createElement("li");
+
+		const input = document.createElement("input");
+		input.value = name;
+
+		input.addEventListener("change", () => {
+		  names[index] = input.value.trim() || names[index];
+		  saveNames();
+		  drawWheel();
+		  renderNameList();
+		});
+
+		const removeBtn = document.createElement("button");
+		removeBtn.textContent = "✕";
+		removeBtn.addEventListener("click", () => {
+		  names.splice(index, 1);
+		  saveNames();
+		  drawWheel();
+		  renderNameList();
+		});
+
+		li.appendChild(input);
+		li.appendChild(removeBtn);
+		list.appendChild(li);
+	  });
+	}	
+
+    function drawWheel() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (names.length === 0) return;
+
+      const sliceAngle = (2 * Math.PI) / names.length;
+
+      names.forEach((name, i) => {
+        const start = rotation + i * sliceAngle;
+        const end = start + sliceAngle;
+
+        // Slice
+        ctx.beginPath();
+        ctx.moveTo(center, center);
+        ctx.arc(center, center, radius, start, end);
+        ctx.fillStyle = colors[i % colors.length];
+        ctx.fill();
+        ctx.stroke();
+
+        // Text
+        ctx.save();
+        ctx.translate(center, center);
+        ctx.rotate(start + sliceAngle / 2);
+        ctx.textAlign = "right";
+        ctx.fillStyle = "#fff";
+        ctx.font = "16px sans-serif";
+        ctx.fillText(name, radius - 10, 5);
+        ctx.restore();
+      });
+
+		// Pointer at 3 o’clock (right side)
+		ctx.fillStyle = "black";
+		ctx.beginPath();
+		ctx.moveTo(canvas.width + 5, center - 10);
+		ctx.lineTo(canvas.width + 5, center + 10);
+		ctx.lineTo(canvas.width - 30, center);
+		ctx.closePath();
+		ctx.fill();
+    }
+
+	function spin() {
+	tickSound.play();
+
+	  if (spinning || names.length === 0) return;
+
+	  spinning = true;
+	  let speed = Math.random() * 0.3 + 0.25;
+	  //let speed = 0.5
+	  console.log("Speed = " + speed);
+	  lastTickIndex = null;
+
+	  function animate() {
+		rotation += speed;
+		speed *= 0.98;
+
+		//playTickIfNeeded();
+		drawWheel();
+
+		if (speed > 0.002) {
+		  requestAnimationFrame(animate);
+		} else {
+		  spinning = false;
+		  announceWinner();
+		}
+	  }
+
+	  animate();
+	}
+
+	function playTickIfNeeded() {
+	  const sliceAngle = (2 * Math.PI) / names.length;
+
+	  // Pointer at 3 o'clock (angle 0)
+	  const normalizedRotation =
+		(2 * Math.PI - (rotation % (2 * Math.PI))) % (2 * Math.PI);
+
+	  const currentIndex = Math.floor(normalizedRotation / sliceAngle);
+	  //if (tickSound.paused === true) {
+		  
+		  if (currentIndex !== lastTickIndex) {
+		  	console.log("playTickIfNeeded()");
+			tickSound.currentTime = 0;
+			tickSound.play();
+			lastTickIndex = currentIndex;
+		  }
+	   //}
+	}
+
+	function announceWinner() {
+	  const sliceAngle = (2 * Math.PI) / names.length;
+
+	  const normalizedRotation =
+		(2 * Math.PI - (rotation % (2 * Math.PI))) % (2 * Math.PI);
+
+	  const index = Math.floor(normalizedRotation / sliceAngle);
+
+	  alert("Winner: " + names[index]);
+	  
+	  fireConfetti();
+	}
+
+	function fireConfetti() {
+	  const duration = 600;
+	  const end = Date.now() + duration;
+
+	  (function frame() {
+		// Left side
+		confetti({
+		  particleCount: 25,
+		  angle: 60,
+		  spread: 55,
+		  startVelocity: 45,
+		  origin: { x: 0.02, y: 0.5 }
+		});
+
+		// Right side
+		confetti({
+		  particleCount: 25,
+		  angle: 120,
+		  spread: 55,
+		  startVelocity: 45,
+		  origin: { x: 0.98, y: 0.5 }
+		});
+
+		if (Date.now() < end) {
+		  requestAnimationFrame(frame);
+		}
+	  })();
+	}
+
+
+
+    document.getElementById("addName").addEventListener("click", () => {
+      const input = document.getElementById("nameInput");
+      const value = input.value.trim();
+
+      if (!value) return;
+
+      names.push(value);
+      input.value = "";
+	  
+	  //loadNames();
+	  saveNames();
+      drawWheel();
+	  renderNameList();
+    });
+	
+	document.getElementById("nameInput").addEventListener("keydown", e => {
+	  if (e.key === "Enter") {
+		document.getElementById("addName").click();
+	  }
+	});
+
+
+    document.getElementById("spin").addEventListener("click", spin);
+	
+	loadNames();
+	renderNameList();
+    drawWheel();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+</body>
+</html>

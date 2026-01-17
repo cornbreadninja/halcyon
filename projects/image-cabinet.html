@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Image Cabinet</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: serif;
+    }
+
+    /* Sky background */
+    .sky {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(
+        to bottom,
+        #9fd6f3 0%,
+        #cfefff 60%,
+        #f9f9f9 100%
+      );
+      overflow: hidden;
+      z-index: -1;
+    }
+
+    .sky::before,
+    .sky::after {
+      content: "";
+      position: absolute;
+      left: -40%;
+      width: 400px;
+      height: 100px;
+      background: rgba(255, 255, 255, 0.7);
+      border-radius: 120px;
+      filter: blur(14px);
+      animation: drift 140s linear infinite;
+    }
+
+    .sky::before { top: 25%; }
+    .sky::after { top: 50%; width: 520px; height: 130px; opacity: 0.6; animation-duration: 200s; }
+
+    @keyframes drift {
+      from { transform: translateX(-30%); }
+      to   { transform: translateX(160%); }
+    }
+
+    /* Main content */
+    .content {
+      max-width: 600px;
+      margin: 4rem auto;
+      padding: 1.5rem;
+      background: rgba(255, 255, 255, 0.85);
+      border-radius: 4px;
+    }
+
+    h1 { margin-top: 0; }
+
+    textarea {
+      width: 100%;
+      height: 80px;
+      margin-bottom: 1rem;
+      font-size: 1rem;
+      font-family: serif;
+    }
+
+    button, input {
+      margin-right: 0.5rem;
+      padding: 0.4rem 0.8rem;
+      font-size: 0.9rem;
+      font-family: serif;
+    }
+
+    #result {
+      margin-top: 2rem;
+      padding: 1rem;
+      background: #fff;
+      border-left: 4px solid #ccc;
+      min-height: 3rem;
+    }
+
+    .io-controls {
+      margin-top: 1rem;
+      display: flex;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+    }
+
+    .import-label {
+      cursor: pointer;
+      color: #333;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="sky"></div>
+
+  <div class="content">
+    <h1>Image Cabinet</h1>
+
+    <textarea id="entry" placeholder="Add a fragment, mental state, or line..."></textarea><br>
+
+    <button onclick="addEntry()">Add</button>
+    <button onclick="pullEntry()">Pull</button>
+
+    <div id="result"></div>
+
+    <div class="io-controls">
+      <button id="exportBtn">Export</button>
+      <label class="import-label">
+        Import
+        <input type="file" id="importInput" accept="application/json">
+      </label>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = "drawer_entries";
+
+    function getEntries() {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    }
+
+    function saveEntries(entries) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+    }
+
+    function addEntry() {
+      const textarea = document.getElementById("entry");
+      const text = textarea.value.trim();
+      if (!text) return;
+
+      const entries = getEntries();
+      entries.push(text);
+      saveEntries(entries);
+
+      textarea.value = "";
+    }
+
+    function pullEntry() {
+      const entries = getEntries();
+      const resultDiv = document.getElementById("result");
+
+      if (entries.length === 0) {
+        resultDiv.textContent = "No entries yet.";
+        return;
+      }
+
+      const index = Math.floor(Math.random() * entries.length);
+      resultDiv.textContent = entries[index];
+    }
+
+    // Enter support: Enter = Add, Shift+Enter = newline
+    document.getElementById("entry").addEventListener("keydown", function(event) {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        addEntry();
+      }
+    });
+
+    function exportEntries() {
+      const entries = getEntries();
+      const data = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        entries
+      };
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "image-cabinet-export.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function importEntries(file) {
+      const reader = new FileReader();
+
+      reader.onload = () => {
+        try {
+          const data = JSON.parse(reader.result);
+          if (!data.entries || !Array.isArray(data.entries)) {
+            alert("Invalid file format.");
+            return;
+          }
+
+          const confirmReplace = confirm(
+            "Replace existing entries?\n\n" +
+            "OK = replace everything\n" +
+            "Cancel = merge"
+          );
+
+          let entries = getEntries();
+          if (confirmReplace) {
+            entries = data.entries;
+          } else {
+            entries = entries.concat(data.entries);
+          }
+
+          saveEntries(entries);
+          alert("Import complete!");
+        } catch (err) {
+          alert("Could not read file.");
+        }
+      };
+
+      reader.readAsText(file);
+    }
+
+    document.getElementById("exportBtn").addEventListener("click", exportEntries);
+    document.getElementById("importInput").addEventListener("change", (e) => {
+      if (e.target.files.length > 0) {
+        importEntries(e.target.files[0]);
+        e.target.value = "";
+      }
+    });
+  </script>
+</body>
+</html>
